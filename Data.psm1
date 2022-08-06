@@ -1093,9 +1093,16 @@ Function Join-PropertyMultiValue
             }
             elseif ($isScript)
             {
+                $thisHash = [ordered]@{}
                 $varList = [System.Collections.Generic.List[PSVariable]]::new()
                 $varList.Add([PSVariable]::new("_", $InputObject))
+                $varList.Add([PSVariable]::new("this", $thisHash))
                 $newValueList = foreach ($item in $Values.InvokeWithContext($null, $varList, $null)) { [pscustomobject]$item }
+                if ($thisHash.Keys.Count)
+                {
+                    if ($newValueList) { throw '$this notation cannot be used when the value script produces output.' }
+                    $newValueList = [pscustomobject]$thisHash
+                }
             }
             else
             {

@@ -242,4 +242,18 @@ Describe "Join-PropertyMultiValue" {
             $exception | Should Match "NoEmptyResults can't be provided when Values is a dictionary"
         }
     }
+
+    Context "`$this Tests" {
+         It 'Implemented' {
+            $result = [pscustomobject]@{A=1; B=2} |
+                Join-PropertyMultiValue {
+                    $this.B = 3
+                    $this.C = 4
+                }
+
+            $result.A | Should Be 1
+            $result.B | Should Be 3
+            $result.C | Should Be 4
+         }
+    }
 }
