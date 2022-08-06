@@ -949,6 +949,130 @@ Function Join-MissingSetCounts
     }
 }
 
+Function Join-MissingTimestamps
+{
+    <#
+    .SYNOPSIS
+    Generates a timestamp range and/or inserts missing timestamps into a record set.
+
+    .PARAMETER InputObject
+    The input objects to generate missing timestamps for. Optional if generating a range from nothing.
+
+    .PARAMETER TimestampProperty
+    The property name to contain the timestamp.
+
+    #>
+    [CmdletBinding(PositionalBinding=$false)]
+    Param
+    (
+        [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
+        [Parameter(Position=0,Mandatory=$true)] [string] $TimestampProperty,
+        [Parameter(ParameterSetName='Days',Mandatory=$true)] [int] $Days,
+        [Parameter(ParameterSetName='Hours',Mandatory=$true)] [int] $Hours,
+        [Parameter(ParameterSetName='Minutes',Mandatory=$true)] [int] $Minutes,
+        [Parameter(ParameterSetName='Seconds',Mandatory=$true)] [int] $Seconds,
+        [Parameter(ParameterSetName='Milliseconds',Mandatory=$true)] [int] $Milliseconds,
+        [Parameter(ParameterSetName='Month',Mandatory=$true)] [switch] $Month,
+        [Parameter()] [datetime] $From,
+        [Parameter()] [datetime] $To,
+        [Parameter()] [string] $Format,
+        [Parameter()] [switch] $ExcludingTo,
+        [Parameter()] [System.Collections.IDictionary] $SetNew
+    )
+    Begin
+    {
+        $inputObjectList = [System.Collections.Generic.List[object]]::new()
+    }
+    Process
+    {
+        if (!$InputObject) { return }
+        $inputObjectList.Add($InputObject)
+    }
+    End
+    {
+        trap { $PSCmdlet.ThrowTerminatingError($_) }
+        
+        $propertyList = @(
+            $TimestampProperty
+            if ($SetNew) { $SetNew.Keys }
+        )
+        
+        $startTime = $From
+        $endTime = $To
+
+        if ($To -lt $From) { throw "To must be greater than or equal to From." }
+
+        if ($PSCmdlet.ParameterSetName -eq 'Days')
+        {
+            $increment = [TimeSpan]::FromDays($Days)
+            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, 0, 0, 0)
+            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, 0, 0, 0)
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'Hours')
+        {
+            $increment = [TimeSpan]::FromHours($Hours)
+            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, 0, 0)
+            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, 0, 0)
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'Minutes')
+        {
+            $increment = [TimeSpan]::FromMinutes($Minutes)
+            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, $startTime.Minute, 0)
+            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, $endTime.Minute, 0)
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'Seconds')
+        {
+            $increment = [TimeSpan]::FromSeconds($Seconds)
+            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, $startTime.Minute, $startTime.Second)
+            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, $endTime.Minute, $endTime.Second)
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'Milliseconds')
+        {
+            $increment = [TimeSpan]::FromMilliseconds($Milliseconds)
+            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, $startTime.Minute, $startTime.Second, $startTime.Millisecond)
+            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, $endTime.Minute, $endTime.Second, $endTime.Millisecond)
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'Month')
+        {
+            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, 1)
+        }
+
+        if ($ExcludingTo) { $endTime = $endTime.AddTicks(-1) }
+        $cursorTime = $startTime
+        while ($cursorTime -le $endTime)
+        {
+            $result = [ordered]@{}
+            foreach ($property in $propertyList)
+            {
+                if ($property -eq $TimestampProperty)
+                {
+                    $result[$property] = $cursorTime
+                    if ($Format) { $result[$property] = $cursorTime.ToString($Format) }
+                }
+                elseif ($SetNew.Contains($property))
+                {
+                    $result[$property] = $SetNew[$property]
+                }
+                else
+                {
+                    $result[$property] = $null
+                }
+            }
+
+            [pscustomobject]$result
+
+            if ($PSCmdlet.ParameterSetName -eq 'Month')
+            {
+                $cursorTime = $cursorTime.AddMonths(1)
+            }
+            else
+            {
+                $cursorTime = $cursorTime + $increment
+            }
+        }
+    }
+}
+
 Function Join-Percentage
 {
     [CmdletBinding(PositionalBinding=$false)]
