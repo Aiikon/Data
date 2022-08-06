@@ -2674,6 +2674,53 @@ Function Set-PropertyDateTimeFormat
     }
 }
 
+Function Set-PropertyRounding
+{
+    <#
+    .SYNOPSIS
+    Rounds the value in one or more properties.
+
+    .PARAMETER InputObject
+    Objects with properties to round.
+
+    .PARAMETER Property
+    The properties to round.
+
+    .PARAMETER Digits
+    The number of digits to round to.
+
+    .PARAMETER DivideBy
+    Attempt to divide the original property value by this amount; useful for byte conversions.
+
+    .EXAMPLE
+    Get-ChildItem C:\Windows -File |
+        Select-Object Name, Length |
+        Set-PropertyRounding Length 2 -DivideBy (1024*1024)
+    #>
+    [CmdletBinding(PositionalBinding=$false)]
+    Param
+    (
+        [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
+        [Parameter(Mandatory=$true, Position=0)] [string[]] $Property,
+        [Parameter(Mandatory=$true, Position=1)] [int] $Digits,
+        [Parameter()] [double] $DivideBy
+    )
+    Process
+    {
+        if (!$InputObject) { return }
+        $newInputObject = [Rhodium.Data.DataHelpers]::CloneObject($InputObject, $Property)
+        foreach ($propertyName in $Property)
+        {
+            $oldValue = $newInputObject.$propertyName
+            if ([String]::IsNullOrEmpty($oldValue)) { continue }
+            if ($DivideBy) { $oldValue = $oldValue / $DivideBy }
+            $newValue = [Math]::Round($oldValue, $Digits)
+            $newInputObject.$propertyName = $newValue
+        }
+        $newInputObject
+    }
+}
+
 Function Set-PropertyStringFormat
 {
     <#
