@@ -255,5 +255,30 @@ Describe "Join-MissingTimestamps" {
 
             $ex.Message | Should Be 'To and From must be used together or not at all.'
         }
+
+        It 'ExcludingTo can only be used with To' {
+            try
+            {
+                $result = Join-MissingTimestamps Date -Days 1 -ExcludingTo -ErrorAction Stop
+            }
+            catch { $ex=$_.Exception }
+
+            $ex.Message | Should Be 'ExcludingTo can only be used with To.'
+        }
+
+        It 'Cannot use the same input timestamp twice' {
+            try
+            {
+                $result = @(
+                    [pscustomobject]@{Date='1/1/2022'}
+                    [pscustomobject]@{Date='1/1/2022'}
+                    [pscustomobject]@{Date='1/3/2022'}
+                ) |
+                    Join-MissingTimestamps Date -Days 1
+            }
+            catch { $ex=$_.Exception }
+
+            $ex.Message | Should Match 'The same timestamp cannot be present more than once in the input data.'
+        }
     }
 }

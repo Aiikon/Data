@@ -959,7 +959,40 @@ Function Join-MissingTimestamps
     The input objects to generate missing timestamps for. Optional if generating a range from nothing.
 
     .PARAMETER TimestampProperty
-    The property name to contain the timestamp.
+    The name of the property containing timestamps.
+
+    .PARAMETER Days
+    Number of days between timestamps.
+
+    .PARAMETER Hours
+    Number of hours between timestamps.
+
+    .PARAMETER Minutes
+    Number of minutes between timestamps.
+
+    .PARAMETER Seconds
+    Number of seconds between timestamps.
+
+    .PARAMETER Milliseconds
+    Number of milliseconds between timestamps.
+
+    .PARAMETER Month
+    Use timestamps a month apart.
+
+    .PARAMETER From
+    Start of the timestamp range if not using the input data range.
+
+    .PARAMETER To
+    End of the timestamp range if not using the input data range.
+
+    .PARAMETER ExcludingTo
+    Stop just before the To range rather than including it.
+
+    .PARAMETER Format
+    ToString format to use for timestamps.
+
+    .PARAMETER SetNew
+    Dictionary of values to set on newly generated objects.
 
     #>
     [CmdletBinding(PositionalBinding=$false)]
@@ -975,16 +1008,17 @@ Function Join-MissingTimestamps
         [Parameter(ParameterSetName='Month',Mandatory=$true)] [switch] $Month,
         [Parameter()] [datetime] $From,
         [Parameter()] [datetime] $To,
-        [Parameter()] [string] $Format,
         [Parameter()] [switch] $ExcludingTo,
+        [Parameter()] [string] $Format,
         [Parameter()] [System.Collections.IDictionary] $SetNew
     )
     Begin
     {
         trap { $PSCmdlet.ThrowTerminatingError($_) }
         $inputObjectList = [System.Collections.Generic.List[object]]::new()
-        if (!(!!$From -xor !$To)) { throw 'To and From must be used together or not at all.' }
+        if (!(!!$From -xor !$To)) { throw "To and From must be used together or not at all." }
         elseif ($To -lt $From) { throw "To must be greater than or equal to From." }
+        if ($ExcludingTo -and -not $To) { throw "ExcludingTo can only be used with To." }
     }
     Process
     {
@@ -1028,7 +1062,7 @@ Function Join-MissingTimestamps
         foreach ($InputObject in $inputObjectList)
         {
             $timestamp = & $floorFunction ($InputObject.$TimestampProperty)
-            if ($inputObjectDict[$timestamp]) { throw "$timestamp is already in the dictionary." }
+            if ($inputObjectDict[$timestamp]) { throw "$timestamp is already in the dictionary. The same timestamp cannot be present more than once in the input data." }
             $inputObjectDict[$timestamp] = $InputObject
         }
 
@@ -1048,6 +1082,7 @@ Function Join-MissingTimestamps
         {
             $startTime = $From
             $endTime = $To
+            if ($ExcludingTo) { $endTime = $endTime.AddTicks(-1) }
         }
         else
         {
@@ -1059,7 +1094,6 @@ Function Join-MissingTimestamps
         if (!$startTime) { return }
         $startTime = & $floorFunction $startTime
         $endTime = & $floorFunction $endTime
-        if ($ExcludingTo) { $endTime = $endTime.AddTicks(-1) }
 
         if ($PSCmdlet.ParameterSetName -eq 'Days')
         {
