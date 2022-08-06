@@ -981,79 +981,125 @@ Function Join-MissingTimestamps
     )
     Begin
     {
+        trap { $PSCmdlet.ThrowTerminatingError($_) }
         $inputObjectList = [System.Collections.Generic.List[object]]::new()
+        if (!(!!$From -xor !$To)) { throw 'To and From must be used together or not at all.' }
+        elseif ($To -lt $From) { throw "To must be greater than or equal to From." }
     }
     Process
     {
         if (!$InputObject) { return }
-        $inputObjectList.Add($InputObject)
+        $newInputObject = [Rhodium.Data.DataHelpers]::CloneObject($InputObject, @())
+        $newInputObject.$TimestampProperty = [datetime]$newInputObject.$TimestampProperty
+        $inputObjectList.Add($newInputObject)
     }
     End
     {
         trap { $PSCmdlet.ThrowTerminatingError($_) }
         
-        $propertyList = @(
-            $TimestampProperty
-            if ($SetNew) { $SetNew.Keys }
-        )
-        
-        $startTime = $From
-        $endTime = $To
+        $floorFunction = { param($timestamp)
+            if ($PSCmdlet.ParameterSetName -eq 'Days')
+            {
+                [DateTime]::new($timestamp.Year, $timestamp.Month, $timestamp.Day, 0, 0, 0)
+            }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Hours')
+            {
+                [DateTime]::new($timestamp.Year, $timestamp.Month, $timestamp.Day, $timestamp.Hour, 0, 0)
+            }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Minutes')
+            {
+                [DateTime]::new($timestamp.Year, $timestamp.Month, $timestamp.Day, $timestamp.Hour, $timestamp.Minute, 0)
+            }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Seconds')
+            {
+                [DateTime]::new($timestamp.Year, $timestamp.Month, $timestamp.Day, $timestamp.Hour, $timestamp.Minute, $timestamp.Second)
+            }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Milliseconds')
+            {
+                [DateTime]::new($timestamp.Year, $timestamp.Month, $timestamp.Day, $timestamp.Hour, $timestamp.Minute, $timestamp.Second, $timestamp.Millisecond)
+            }
+            elseif ($PSCmdlet.ParameterSetName -eq 'Month')
+            {
+                [DateTime]::new($timestamp.Year, $timestamp.Month, 1)
+            }
+        }
 
-        if ($To -lt $From) { throw "To must be greater than or equal to From." }
+        $inputObjectDict = @{}
+        foreach ($InputObject in $inputObjectList)
+        {
+            $timestamp = & $floorFunction ($InputObject.$TimestampProperty)
+            if ($inputObjectDict[$timestamp]) { throw "$timestamp is already in the dictionary." }
+            $inputObjectDict[$timestamp] = $InputObject
+        }
+
+        $propertyList = if ($inputObjectList.Count)
+        {
+            $inputObjectList[0].PSObject.Properties.Name
+        }
+        else
+        {
+            @(
+                $TimestampProperty
+                if ($SetNew) { $SetNew.Keys }
+            )
+        }
+        
+        if ($From)
+        {
+            $startTime = $From
+            $endTime = $To
+        }
+        else
+        {
+            $measure = $inputObjectList | Sort-Object $TimestampProperty
+            $startTime = [datetime]$measure[0].$TimestampProperty
+            $endTime = [datetime]$measure[-1].$TimestampProperty
+        }
+
+        if (!$startTime) { return }
+        $startTime = & $floorFunction $startTime
+        $endTime = & $floorFunction $endTime
+        if ($ExcludingTo) { $endTime = $endTime.AddTicks(-1) }
 
         if ($PSCmdlet.ParameterSetName -eq 'Days')
         {
             $increment = [TimeSpan]::FromDays($Days)
-            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, 0, 0, 0)
-            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, 0, 0, 0)
         }
         elseif ($PSCmdlet.ParameterSetName -eq 'Hours')
         {
             $increment = [TimeSpan]::FromHours($Hours)
-            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, 0, 0)
-            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, 0, 0)
         }
         elseif ($PSCmdlet.ParameterSetName -eq 'Minutes')
         {
             $increment = [TimeSpan]::FromMinutes($Minutes)
-            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, $startTime.Minute, 0)
-            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, $endTime.Minute, 0)
         }
         elseif ($PSCmdlet.ParameterSetName -eq 'Seconds')
         {
             $increment = [TimeSpan]::FromSeconds($Seconds)
-            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, $startTime.Minute, $startTime.Second)
-            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, $endTime.Minute, $endTime.Second)
         }
         elseif ($PSCmdlet.ParameterSetName -eq 'Milliseconds')
         {
             $increment = [TimeSpan]::FromMilliseconds($Milliseconds)
-            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, $startTime.Day, $startTime.Hour, $startTime.Minute, $startTime.Second, $startTime.Millisecond)
-            $endTime = [DateTime]::new($endTime.Year, $endTime.Month, $endTime.Day, $endTime.Hour, $endTime.Minute, $endTime.Second, $endTime.Millisecond)
-        }
-        elseif ($PSCmdlet.ParameterSetName -eq 'Month')
-        {
-            $startTime = [DateTime]::new($startTime.Year, $startTime.Month, 1)
         }
 
-        if ($ExcludingTo) { $endTime = $endTime.AddTicks(-1) }
         $cursorTime = $startTime
         while ($cursorTime -le $endTime)
         {
-            $result = [ordered]@{}
+            $hasInputObject = !!$inputObjectDict[$cursorTime]
+            if ($hasInputObject) { $result = $inputObjectDict[$cursorTime] } else { $result = [ordered]@{} }
+            
             foreach ($property in $propertyList)
             {
                 if ($property -eq $TimestampProperty)
                 {
-                    $result[$property] = $cursorTime
-                    if ($Format) { $result[$property] = $cursorTime.ToString($Format) }
+                    $result.$property = $cursorTime
+                    if ($Format) { $result.$property = $cursorTime.ToString($Format) }
                 }
-                elseif ($SetNew.Contains($property))
+                elseif (!$hasInputObject -and $SetNew.Contains($property))
                 {
                     $result[$property] = $SetNew[$property]
                 }
-                else
+                elseif (!$hasInputObject)
                 {
                     $result[$property] = $null
                 }

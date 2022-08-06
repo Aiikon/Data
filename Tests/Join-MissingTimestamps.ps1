@@ -92,6 +92,69 @@ Describe "Join-MissingTimestamps" {
         }
     }
 
+    Context 'Joining to Input Ranges' {
+        It 'Inserts values into ranges' {
+            $result = @(
+                [pscustomobject]@{Timestamp='1/1/2022 3:05:00 AM'; Events=50}
+                [pscustomobject]@{Timestamp='1/1/2022 3:10:00 AM'; Events=40}
+                [pscustomobject]@{Timestamp='1/1/2022 3:30:00 AM'; Events=10}
+            ) |
+                Join-MissingTimestamps Timestamp -Minutes 5 -From '1/1/2022 3:00:00 AM' -To '1/1/2022 3:55:00 AM' -SetNew @{Events=0}
+
+            @($result).Count | Should Be 12
+            $result[0].Timestamp | Should Be ([datetime]"1/1/2022 3:00 AM")
+            $result[1].Timestamp | Should Be ([datetime]"1/1/2022 3:05 AM")
+            $result[-1].Timestamp | Should Be ([datetime]"1/1/2022 3:55 AM")
+
+            $result[0].Events | Should Be 0
+            $result[1].Events | Should Be 50
+            $result[2].Events | Should Be 40
+            $result[3].Events | Should Be 0
+            $result[6].Events | Should Be 10
+            $result[-1].Events | Should Be 0
+        }
+
+        It 'Formats timestamps in ranges' {
+            $result = @(
+                [pscustomobject]@{Timestamp='1/1/2022 3:05:00 AM'; Events=50}
+                [pscustomobject]@{Timestamp='1/1/2022 3:10:00 AM'; Events=40}
+                [pscustomobject]@{Timestamp='1/1/2022 3:30:00 AM'; Events=10}
+            ) |
+                Join-MissingTimestamps Timestamp -Minutes 5 -From '1/1/2022 3:00:00 AM' -To '1/1/2022 3:55:00 AM' -SetNew @{Events=0} -Format 'yyyy-MM-dd HH:mm:ss'
+
+            @($result).Count | Should Be 12
+            $result[0].Timestamp | Should Be '2022-01-01 03:00:00'
+            $result[1].Timestamp | Should Be '2022-01-01 03:05:00'
+            $result[-1].Timestamp | Should Be '2022-01-01 03:55:00'
+
+            $result[0].Events | Should Be 0
+            $result[1].Events | Should Be 50
+            $result[2].Events | Should Be 40
+            $result[3].Events | Should Be 0
+            $result[6].Events | Should Be 10
+            $result[-1].Events | Should Be 0
+        }
+
+        It 'Can get From and To from the input range' {
+            $result = @(
+                [pscustomobject]@{Timestamp='1/1/2022 3:05:00 AM'; Events=50}
+                [pscustomobject]@{Timestamp='1/1/2022 3:10:00 AM'; Events=40}
+                [pscustomobject]@{Timestamp='1/1/2022 3:30:00 AM'; Events=10}
+            ) |
+                Join-MissingTimestamps Timestamp -Minutes 5 -SetNew @{Events=0}
+
+            @($result).Count | Should Be 6
+            $result[0].Timestamp | Should Be ([datetime]"1/1/2022 3:05 AM")
+            $result[1].Timestamp | Should Be ([datetime]"1/1/2022 3:10 AM")
+            $result[-1].Timestamp | Should Be ([datetime]"1/1/2022 3:30 AM")
+
+            $result[0].Events | Should Be 50
+            $result[1].Events | Should Be 40
+            $result[2].Events | Should Be 0
+            $result[5].Events | Should Be 10
+        }
+    }
+
     Context 'Data Cleanup Checks' {
         
         It 'Can do a single date' {
@@ -148,6 +211,27 @@ Describe "Join-MissingTimestamps" {
             $result[1].Date | Should Be ([datetime]"1/1/2022 3:00:00.500 AM")
             $result[-1].Date | Should Be ([datetime]"1/1/2022 3:00:09.500 AM")
         }
+
+        It 'Floors minutes when ranges are used' {
+            $result = @(
+                [pscustomobject]@{Timestamp='1/1/2022 3:05:10 AM'; Events=50}
+                [pscustomobject]@{Timestamp='1/1/2022 3:10:00 AM'; Events=40}
+                [pscustomobject]@{Timestamp='1/1/2022 3:30:10 AM'; Events=10}
+            ) |
+                Join-MissingTimestamps Timestamp -Minutes 5 -From '1/1/2022 3:00:00 AM' -To '1/1/2022 3:55:00 AM' -SetNew @{Events=0}
+
+            @($result).Count | Should Be 12
+            $result[0].Timestamp | Should Be ([datetime]"1/1/2022 3:00 AM")
+            $result[1].Timestamp | Should Be ([datetime]"1/1/2022 3:05 AM")
+            $result[-1].Timestamp | Should Be ([datetime]"1/1/2022 3:55 AM")
+
+            $result[0].Events | Should Be 0
+            $result[1].Events | Should Be 50
+            $result[2].Events | Should Be 40
+            $result[3].Events | Should Be 0
+            $result[6].Events | Should Be 10
+            $result[-1].Events | Should Be 0
+        }
     }
 
     Context 'Validation Checks' {
@@ -160,6 +244,16 @@ Describe "Join-MissingTimestamps" {
             catch { $ex=$_.Exception }
 
             $ex.Message | Should Be 'To must be greater than or equal to From.'
+        }
+
+        It 'Must use both or neither To and From' {
+            try
+            {
+                $result = Join-MissingTimestamps Date -Days 1 -From "1/10/2022" -ErrorAction Stop
+            }
+            catch { $ex=$_.Exception }
+
+            $ex.Message | Should Be 'To and From must be used together or not at all.'
         }
     }
 }
