@@ -961,6 +961,9 @@ Function Join-MissingTimestamps
     .PARAMETER TimestampProperty
     The name of the property containing timestamps.
 
+    .PARAMETER SetKeys
+    Properties containing the unique values when generating timestamps for each value in a series.
+
     .PARAMETER Days
     Number of days between timestamps.
 
@@ -994,12 +997,16 @@ Function Join-MissingTimestamps
     .PARAMETER SetNew
     Dictionary of values to set on newly generated objects.
 
+    .PARAMETER KeyJoin
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group.
+
     #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
         [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
         [Parameter(Position=0,Mandatory=$true)] [string] $TimestampProperty,
+        [Parameter()] [string[]] $SetKeys,
         [Parameter(ParameterSetName='Days',Mandatory=$true)] [int] $Days,
         [Parameter(ParameterSetName='Hours',Mandatory=$true)] [int] $Hours,
         [Parameter(ParameterSetName='Minutes',Mandatory=$true)] [int] $Minutes,
@@ -1010,7 +1017,8 @@ Function Join-MissingTimestamps
         [Parameter()] [datetime] $To,
         [Parameter()] [switch] $ExcludingTo,
         [Parameter()] [string] $Format,
-        [Parameter()] [System.Collections.IDictionary] $SetNew
+        [Parameter()] [System.Collections.IDictionary] $SetNew,
+        [Parameter()] [string] $KeyJoin = '|'
     )
     Begin
     {
@@ -1061,7 +1069,12 @@ Function Join-MissingTimestamps
         $inputObjectDict = @{}
         foreach ($InputObject in $inputObjectList)
         {
-            $timestamp = & $floorFunction ($InputObject.$TimestampProperty)
+            $timestamp = (& $floorFunction ($InputObject.$TimestampProperty)).Ticks.ToString()
+            if ($SetKeys)
+            {
+                $setKey = @(foreach ($key in $SetKeys) { $InputObject.$key }) -join $KeyJoin
+                $timestamp = "$timestamp$KeyJoin$setKey"
+            }
             if ($inputObjectDict[$timestamp]) { throw "$timestamp is already in the dictionary. The same timestamp cannot be present more than once in the input data." }
             $inputObjectDict[$timestamp] = $InputObject
         }
@@ -1077,6 +1090,9 @@ Function Join-MissingTimestamps
                 if ($SetNew) { $SetNew.Keys }
             )
         }
+
+        if ($SetKeys) { $setValueList = $inputObjectList | Select-Object $SetKeys -Unique }
+        else { $setValueList = '' }
         
         if ($From)
         {
@@ -1119,27 +1135,41 @@ Function Join-MissingTimestamps
         $cursorTime = $startTime
         while ($cursorTime -le $endTime)
         {
-            $hasInputObject = !!$inputObjectDict[$cursorTime]
-            if ($hasInputObject) { $result = $inputObjectDict[$cursorTime] } else { $result = [ordered]@{} }
-            
-            foreach ($property in $propertyList)
+            foreach ($setValue in $setValueList)
             {
-                if ($property -eq $TimestampProperty)
+                $cursorTimeKey = $cursorTime.Ticks.ToString()
+                if ($SetKeys)
                 {
-                    $result.$property = $cursorTime
-                    if ($Format) { $result.$property = $cursorTime.ToString($Format) }
+                    $setKey = @(foreach ($key in $SetKeys) { $setValue.$key }) -join $KeyJoin
+                    $cursorTimeKey = "$cursorTimeKey$KeyJoin$setKey"
                 }
-                elseif (!$hasInputObject -and $SetNew.Contains($property))
-                {
-                    $result[$property] = $SetNew[$property]
-                }
-                elseif (!$hasInputObject)
-                {
-                    $result[$property] = $null
-                }
-            }
 
-            [pscustomobject]$result
+                $hasInputObject = !!$inputObjectDict[$cursorTimeKey]
+                if ($hasInputObject) { $result = $inputObjectDict[$cursorTimeKey] } else { $result = [ordered]@{} }
+            
+                foreach ($property in $propertyList)
+                {
+                    if ($property -eq $TimestampProperty)
+                    {
+                        $result.$property = $cursorTime
+                        if ($Format) { $result.$property = $cursorTime.ToString($Format) }
+                    }
+                    elseif ($SetKeys -and $property -in $SetKeys)
+                    {
+                        $result.$property = $setValue.$property
+                    }
+                    elseif (!$hasInputObject -and $SetNew.Contains($property))
+                    {
+                        $result[$property] = $SetNew[$property]
+                    }
+                    elseif (!$hasInputObject)
+                    {
+                        $result[$property] = $null
+                    }
+                }
+
+                [pscustomobject]$result
+            }
 
             if ($PSCmdlet.ParameterSetName -eq 'Month')
             {

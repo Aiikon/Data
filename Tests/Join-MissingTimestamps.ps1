@@ -155,6 +155,33 @@ Describe "Join-MissingTimestamps" {
         }
     }
 
+    Context 'Joining to Input Ranges with Set' {
+        It 'Does a single set property/value' {
+            $result = @(
+                [pscustomobject]@{Timestamp='1/1/2022 3:05:00 AM'; Series='A'; Events=50}
+                [pscustomobject]@{Timestamp='1/1/2022 3:05:00 AM'; Series='B'; Events=40}
+                [pscustomobject]@{Timestamp='1/1/2022 3:30:00 AM'; Series='B'; Events=10}
+            ) |
+                Join-MissingTimestamps Timestamp -Minutes 5 -From '1/1/2022 3:00:00 AM' -To '1/1/2022 3:55:00 AM' -SetKeys Series -SetNew @{Events=0}
+
+            @($result).Count | Should Be 24
+            $result[0].Timestamp | Should Be ([datetime]"1/1/2022 3:00 AM")
+            $result[1].Timestamp | Should Be ([datetime]"1/1/2022 3:00 AM")
+            $result[2].Timestamp | Should Be ([datetime]"1/1/2022 3:05 AM")
+            $result[3].Timestamp | Should Be ([datetime]"1/1/2022 3:05 AM")
+            $result[-1].Timestamp | Should Be ([datetime]"1/1/2022 3:55 AM")
+
+            $result[0].Events | Should Be 0
+            $result[1].Events | Should Be 0
+            $result[2].Events | Should Be 50
+            $result[3].Events | Should Be 40
+            $result[4].Events | Should Be 0
+            $result[5].Events | Should Be 0
+            $result[12].Events | Should Be 0
+            $result[13].Events | Should Be 10
+        }
+    }
+
     Context 'Data Cleanup Checks' {
         
         It 'Can do a single date' {
@@ -231,6 +258,10 @@ Describe "Join-MissingTimestamps" {
             $result[3].Events | Should Be 0
             $result[6].Events | Should Be 10
             $result[-1].Events | Should Be 0
+        }
+
+        It 'Floors relative to the date for non-single-digit increments' {
+            
         }
     }
 
