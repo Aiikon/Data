@@ -33,6 +33,15 @@ Describe "Set-PropertyDateTimeFormat" {
                 Set-PropertyDateTimeFormat Date yyyy-MM-dd -AppendTimeZone Long
         }
 
+        It 'Works with AppendFuzzyTimestamp Default' {
+            $timestamp = [DateTime]::Now.AddMinutes(15)
+            $result = [pscustomobject]@{A=1;Timestamp=$timestamp} |
+                Set-PropertyDateTimeFormat Timestamp 'yyyy-MM-dd HH:mm:ss dddd h tt' -AppendFuzzyTimestamp Default
+
+            $result.A | Should Be 1
+            $result.Timestamp | Should Be "$($timestamp.ToString('yyyy-MM-dd HH:mm:ss dddd h tt')) (15 minutes from now)"
+        }
+
         It 'Ignores Null' {
             [pscustomobject]@{A=$null} |
                 Set-PropertyDateTimeFormat A 'yyyy-MM-dd' |

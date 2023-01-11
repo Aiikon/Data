@@ -51,5 +51,11 @@ Describe "Convert-DateTimeZone" {
             $result = Convert-DateTimeZone $local -FromLocal -ToUtc -Format 'yyyy-MM-dd HH:mm:ss' -AppendTimeZone Long
             $result | Should Be "$($local.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')) UTC"
         }
+
+        It 'Can append fuzzy timestamp' {
+            $local = [DateTime]::Now.AddMinutes(15)
+            $result = Convert-DateTimeZone $local -FromLocal -ToUtc -Format 'yyyy-MM-dd HH:mm:ss' -AppendTimeZone Long -AppendFuzzyTimestamp Default
+            $result | Should Be "$($local.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')) UTC (15 minutes from now)"
+        }
     }
 }

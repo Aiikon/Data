@@ -126,6 +126,7 @@ FunctionsToExport = @(
     'Set-PropertyJoinValue'
     'Set-PropertySplitValue'
     'Get-FormattedXml'
+    'Get-FuzzyTimestamp'
     'Get-IndentedText'
     'Get-Sentences'
     'Get-StringHash'

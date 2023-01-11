@@ -1906,13 +1906,15 @@ Function Convert-DateTimeZone
         [Parameter()] [switch] $ToLocal,
         [Parameter()] [switch] $ToUtc,
         [Parameter()] [string] $Format,
-        [Parameter()] [ValidateSet('Short', 'Long')] [string] $AppendTimeZone
+        [Parameter()] [ValidateSet('Short', 'Long')] [string] $AppendTimeZone,
+        [Parameter()] [ValidateSet('Default')] [string] $AppendFuzzyTimestamp
     )
     Begin
     {
         trap { $PSCmdlet.ThrowTerminatingError($_) }
 
         if ($AppendTimeZone -and -not $Format) { throw "Format must be specified with AppendTimeZone." }
+        if ($AppendFuzzyTimestamp -and -not $Format) { throw "Format must be specified with AppendFuzzyTimestamp." }
 
         $fromTimeZoneMode = $null
         $toTimeZoneMode = $null
@@ -2019,7 +2021,12 @@ Function Convert-DateTimeZone
                     if ($toTimeZoneValue.IsDaylightSavingTime($newValue)) { " $dst" } else { " $st" }
                 }
 
-                $newValue = "$($newValue.ToString($Format))$timeZoneLabel"
+                $fuzzyLabel = if ($AppendFuzzyTimestamp)
+                {
+                    " ($(Get-FuzzyTimestamp $dateTimeUtc -Utc))"
+                }
+
+                $newValue = "$($newValue.ToString($Format))$timeZoneLabel$fuzzyLabel"
             }
 
             if ($PSCmdlet.ParameterSetName -eq 'Value') { return $newValue }
@@ -2863,7 +2870,8 @@ Function Set-PropertyDateTimeFormat
         [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
         [Parameter(Mandatory=$true, Position=0)] [string[]] $Property,
         [Parameter(Mandatory=$true, Position=1)] [string] $Format,
-        [Parameter()] [ValidateSet('Short', 'Long')] [string] $AppendTimeZone
+        [Parameter()] [ValidateSet('Short', 'Long')] [string] $AppendTimeZone,
+        [Parameter()] [ValidateSet('Default')] [string] $AppendFuzzyTimestamp
     )
     Begin
     {
@@ -2900,6 +2908,10 @@ Function Set-PropertyDateTimeFormat
                 {
                     $newValue = "$newValue $st"
                 }
+            }
+            if ($AppendFuzzyTimestamp)
+            {
+                $newValue = "$newValue ($(Get-FuzzyTimestamp $oldValue))"
             }
             $newInputObject.$propertyName = $newValue
 
@@ -3233,6 +3245,37 @@ Function Get-FormattedXml
         $xmlWriter.Formatting = [System.Xml.Formatting]::Indented
         $xmlDoc.WriteContentTo($xmlWriter)
         $stringWriter.ToString()
+    }
+}
+
+Function Get-FuzzyTimestamp
+{
+    [CmdletBinding(PositionalBinding=$false)]
+    Param
+    (
+        [Parameter(Mandatory=$true, Position=0)] [DateTime] $Timestamp,
+        [Parameter()] [switch] $Utc
+    )
+    End
+    {
+        if ($Utc) { $now = [DateTime]::UtcNow } else { $now = [DateTime]::Now }
+        $minutesAgo = ($now - $Timestamp).TotalMinutes
+        $minutesAbs = [Math]::Floor([Math]::Abs($minutesAgo))
+        $value = if ($minutesAbs -eq 0) { 'less than a minute' }
+        elseif ($minutesAbs -eq 1) { 'a minute' }
+        elseif ($minutesAbs -lt 45) { "$minutesAbs minutes" }
+        elseif ($minutesAbs -lt 90) { 'about 1 hour' }
+        elseif ($minutesAbs -lt 1440) { "about $([Math]::Floor($minutesAbs/60)) hours" }
+        elseif ($minutesAbs -lt 2880) { "1 day" }
+        elseif ($minutesAbs -lt 43200) { "$([Math]::Floor($minutesAbs/1440)) days" }
+        elseif ($minutesAbs -lt 86400) { "about 1 month" }
+        elseif ($minutesAbs -lt 525960) { "$([Math]::Floor($minutesAbs/43200)) months" }
+        elseif ($minutesAbs -lt 1048320) { "about 1 year" }
+        elseif ($minutesAbs -lt 157788000) { "$([Math]::Floor($minutesAbs/525600)) years" }
+        else { "$([Math]::Floor($minutesAbs/525960)) years" }
+
+        $keyword = if ($minutesAgo -ge 0) { 'ago' } else { 'from now' }
+        "$value $keyword"
     }
 }
 
