@@ -1654,7 +1654,8 @@ Function Join-UniqueIndex
         [Parameter(Position=0)] [string[]] $Property,
         [Parameter()] [string] $IndexProperty = 'UniqueIndex',
         [Parameter()] [int] $StartAt = 0,
-        [Parameter()] [string] $KeyJoin = '|'
+        [Parameter()] [string] $KeyJoin = '|',
+        [Parameter()] [string[]] $StartingValues
     )
     Begin
     {
@@ -1668,6 +1669,14 @@ Function Join-UniqueIndex
     End
     {
         $keyDict = @{}
+        if ($StartingValues)
+        {
+            foreach ($value in $StartingValues)
+            {
+                $keyDict[$value] = $StartAt
+                $StartAt += 1
+            }
+        }
         foreach ($object in $inputObjectList)
         {
             $key = $(foreach ($p in $Property) { $object.$p }) -join $KeyJoin

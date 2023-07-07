@@ -21,5 +21,19 @@ Describe "Join-UniqueIndex" {
             $results[3].UniqueIndex | Should Be 1
             $results[4].UniqueIndex | Should Be 3
         }
+
+        It "Can override starting indices" {
+            $results = @(
+                [pscustomobject]@{A=0}
+                [pscustomobject]@{A=1}
+                [pscustomobject]@{A=2}
+                [pscustomobject]@{A=3}
+            ) | Join-UniqueIndex A -StartingValues 2, 1
+
+            $results[0].UniqueIndex | Should Be 2
+            $results[1].UniqueIndex | Should Be 1
+            $results[2].UniqueIndex | Should Be 0
+            $results[3].UniqueIndex | Should Be 3
+        }
     }
 }
