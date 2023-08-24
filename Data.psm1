@@ -41,6 +41,93 @@ namespace Rhodium.Data
 
 Function Group-Denormalized
 {
+    <#
+    .SYNOPSIS
+    Groups "denormalized" objects (i.e. expanded through joins) together for easier processing.
+    Behaves similar to Group-Object at first except instead of a Name property all the original
+    property names are preserved. Has many parameters for common operations and statistics.
+
+    .PARAMETER InputObject
+    The objects to group.
+
+    .PARAMETER GroupProperty
+    The properties to group objects by.
+
+    .PARAMETER NoCount
+    Don't automatically add a Count property containing the count of objects grouped.
+
+    .PARAMETER CountProperty
+    Name of the property to store the grouped object count in. Defaults to Count.
+
+    .PARAMETER ToGroupProperty
+    Optionally store the original grouped objects in a property with this name.
+
+    .PARAMETER KeepFirst
+    Optional statistic parameter. Keep the first value of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER KeepLast
+    Optional statistic parameter. Keep the last value of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER KeepAll
+    Optional statistic parameter. Keep the all non-empty values of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER KeepUnique
+    Optional statistic parameter. Keep the all non-empty unique values of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER Sum
+    Optional statistic parameter. Keep the sum of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER Min
+    Optional statistic parameter. Keep the minimum value of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER Max
+    Optional statistic parameter. Keep the maximum value of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER Avg
+    Optional statistic parameter. Keep the average value of these properties in each group.
+    Stored in a new property if another statistic is in use. Supports wildcards.
+
+    .PARAMETER CountAll
+    Optional statistic parameter. Counts the number of non-empty values of these properties in each group.
+    Stored in a new property. Supports wildcards.
+
+    .PARAMETER CountUnique
+    Optional statistic parameter. Counts the number of unique non-empty values of these properties in each group.
+    Stored in a new property. Supports wildcards.
+
+    .PARAMETER AllowEmpty
+    Keeps empty values when combined with the KeepAll, KeepUnique, CountAll and CountUnique parameters.
+
+    .PARAMETER JoinWith
+    Joins the values in KeepAll and KeepUnique with this string.
+
+    .EXAMPLE
+    Get-Service |
+        Group-Denormalized StartType -CountProperty Services
+
+    .EXAMPLE
+    Get-ChildItem C:\Windows -File |
+        Group-Denormalized Extension -KeepAll Name, Length -Min Length -Max Length -Avg Length -Sum Length -JoinWith "`r`n" |
+        Out-GridView
+
+    .EXAMPLE
+    Get-Process |
+        Sort-Object StartTime -ErrorAction SilentlyContinue |
+        Group-Denormalized Name -ToGroupProperty ProcessObjects -KeepFirst StartTime -KeepLast StartTime -KeepAll Id
+
+    .EXAMPLE
+    Get-Service |
+        Select-Object StartType, Name, DisplayName |
+        Group-Denormalized StartType -KeepFirst * -NoCount
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -437,6 +524,27 @@ Function Group-SequentialSame
 
 Function Join-GroupCount
 {
+    <#
+    .SYNOPSIS
+    Adds a property to each object containing the count of all other objects with the same
+    values in one or more group properties. Groups objects together when passing them through.
+    Useful for generating rowspan values for html tables.
+
+    .PARAMETER InputObject
+    The objects to process.
+
+    .PARAMETER GroupProperty
+    The properties to group objects by.
+
+    .PARAMETER CountProperty
+    The name of the property to add the group count to. Defaults to GroupCount.
+
+    .EXAMPLE
+    Get-Service |
+        Select-Object Name, StartType |
+        Join-GroupCount StartType ServicesWithSameStartType
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -494,7 +602,7 @@ Function Join-GroupHeaderRow
     Sum up the values of these properties and include them on the new row.
 
     .PARAMETER KeyJoin
-    Objects are grouped as though their values were strings; join them with this value when making the key for each group.
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
 
     .EXAMPLE
     Get-Process |
@@ -860,6 +968,30 @@ Function Join-List
 
 Function Join-Index
 {
+    <#
+    .SYNOPSIS
+    Adds an index property to each object containing its position in the pipeline.
+
+    .PARAMETER InputObject
+    The objects to process.
+
+    .PARAMETER IndexProperty
+    The name of the property to store the index in. Defaults to Index.
+
+    .PARAMETER Start
+    The value to start numbering at. Defaults to 0.
+
+    .EXAMPLE
+    Get-Service |
+        Select-Object Name, DisplayName |
+        Join-Index
+
+    .EXAMPLE
+    Get-ChildItem C:\Windows -File |
+        Select-Object Name, Length |
+        Join-Index -IndexProperty FilePosition -Start 1
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -998,7 +1130,7 @@ Function Join-MissingTimestamps
     Dictionary of values to set on newly generated objects.
 
     .PARAMETER KeyJoin
-    Objects are grouped as though their values were strings; join them with this value when making the key for each group.
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
 
     #>
     [CmdletBinding(PositionalBinding=$false)]
@@ -1501,7 +1633,7 @@ Function Join-Self
     The keys on the scriptblock side to join the input and processed input objects on. Optional. Defaults to InputKeys.
 
     .PARAMETER KeyJoin
-    Objects are grouped as though their values were strings; join them with this value when making the key for each group.
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
 
     .PARAMETER KeepProperty
     Properties to keep from the processed input. Also serves to set the empty properties to add if no results are added.
@@ -2133,7 +2265,7 @@ Function Select-DedupByPropertyValue
     The number of objects to keep for each key.
 
     .PARAMETER KeyJoin
-    The string to join multiple values with to form the key.
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
 
     .EXAMPLE
     Get-Process | Select-DedupByPropertyValue Name
@@ -2172,6 +2304,25 @@ Function Select-DedupByPropertyValue
 
 Function Select-DuplicatePropertyValue
 {
+    <#
+    .SYNOPSIS
+    Returns all input objects with key values that appear more than once. Does not attempt to change the order of objects
+    but some reordering may occur the first time a duplicate is found.
+
+    .PARAMETER InputObject
+    The objects to filter.
+
+    .PARAMETER Property
+    The properties on the input objects to use for key values.
+
+    .PARAMETER KeyJoin
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
+
+    .EXAMPLE
+    Get-Process |
+       Select-DuplicatePropertyValue ProcessName
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -2204,6 +2355,34 @@ Function Select-DuplicatePropertyValue
 
 Function Select-Excluding
 {
+    <#
+    .SYNOPSIS
+    Filters a set of input objects against a set of comparison objects and returns only
+    the input objects with key values that do not exist in the comparison objects.
+
+    .PARAMETER InputObject
+    The objects to filter.
+
+    .PARAMETER InputKeys
+    The properties on the input objects to use for key values.
+
+    .PARAMETER CompareData
+    The objects to compare the input objects to.
+
+    .PARAMETER CompareKeys
+    The properties on the comparison objects to use for key values. Defaults to InputKeys.
+
+    .PARAMETER KeyJoin
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
+
+    .EXAMPLE
+    Get-Service |
+        Select-Excluding StartType, Status @(
+            [pscustomobject]@{StartType='Automatic';Status='Running'}
+            [pscustomobject]@{StartType='Disabled';Status='Stopped'}
+        )
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -2234,6 +2413,34 @@ Function Select-Excluding
 
 Function Select-Including
 {
+    <#
+    .SYNOPSIS
+    Filters a set of input objects against a set of comparison objects and returns only
+    the input objects with key values that exist in the comparison objects.
+
+    .PARAMETER InputObject
+    The objects to filter.
+
+    .PARAMETER InputKeys
+    The properties on the input objects to use for key values.
+
+    .PARAMETER CompareData
+    The objects to compare the input objects to.
+
+    .PARAMETER CompareKeys
+    The properties on the comparison objects to use for key values. Defaults to InputKeys.
+
+    .PARAMETER KeyJoin
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
+
+    .EXAMPLE
+    Get-Service |
+        Select-Including StartType, Status @(
+            [pscustomobject]@{StartType='Automatic';Status='Running'}
+            [pscustomobject]@{StartType='Disabled';Status='Stopped'}
+        )
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
