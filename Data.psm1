@@ -3023,6 +3023,50 @@ Function Set-PropertyStringFormat
     }
 }
 
+Function Set-PropertyTotalValue
+{
+    <#
+    .SYNOPSIS
+    Adds a TotalProperty property to each object totaling up the value of $Property fields.
+
+    .PARAMETER InputObject
+    Objects with properties to format.
+
+    .PARAMETER ValueProperties
+    The properties containing values to total.
+
+    .PARAMETER TotalProperty
+    The property to store the total in.
+
+    .EXAMPLE
+    [pscustomobject]@{Category='Question A'; Yes=5; No=4} |
+        Set-PropertyTotalValue Yes, No
+    #>
+    [CmdletBinding(PositionalBinding=$false)]
+    Param
+    (
+        [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
+        [Parameter(Mandatory=$true, Position=0)] [string[]] $ValueProperties,
+        [Parameter(Position=1)] [string] $TotalProperty = 'Total'
+    )
+    Begin
+    {
+        if (!$TotalProperty) { throw "TotalProperty must not be empty." }
+    }
+    Process
+    {
+        $newInputObject = [Rhodium.Data.DataHelpers]::CloneObject($InputObject, $TotalProperty)
+        $total = 0
+        foreach ($prop in $ValueProperties)
+        {
+            if ([String]::IsNullOrEmpty($newInputObject.$prop)) { continue }
+            $total += $newInputObject.$prop
+        }
+        $newInputObject.$TotalProperty = $total
+        $newInputObject
+    }
+}
+
 Function Set-PropertyType
 {
     <#

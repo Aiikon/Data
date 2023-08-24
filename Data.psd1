@@ -121,6 +121,7 @@ FunctionsToExport = @(
     'Set-PropertyDateTimeFormat'
     'Set-PropertyRounding'
     'Set-PropertyStringFormat'
+    'Set-PropertyTotalValue'
     'Set-PropertyType'
     'Set-PropertyValue'
     'Set-PropertyJoinValue'
