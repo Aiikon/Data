@@ -3510,15 +3510,50 @@ Function Get-FormattedXml
 
 Function Get-FuzzyTimestamp
 {
-    [CmdletBinding(PositionalBinding=$false)]
+    <#
+    .SYNOPSIS
+    Gets a fuzzy description of a timestamp (i.e. "5 minutes ago") from a DateTime
+    relative to the current time (default) or a specific time.
+
+    .PARAMETER Timestamp
+    The timestamp to compare. Will compare to the current time unless RelativeTimestamp is used.
+
+    .PARAMETER Utc
+    Use the current UTC time as the relative timestamp.
+
+    .PARAMETER RelativeTimestamp
+    Specify another timestamp to compare to. Also changes the verbiage from "ago" to "earlier".
+
+    .EXAMPLE
+    Get-FuzzyTimestamp ([DateTime]::Now.AddMinutes(-5))
+
+    .EXAMPLE
+    Get-FuzzyTimestamp ([DateTime]::UtcNow.AddMinutes(15)) -Utc
+
+    .EXAMPLE
+    Get-FuzzyTimestamp ([DateTime]::Now.AddMinutes(30)) -RelativeTimestamp ([DateTime]::Now.AddMinutes(-10))
+
+
+    #>
+    [CmdletBinding(PositionalBinding=$false,DefaultParameterSetName='Current')]
     Param
     (
         [Parameter(Mandatory=$true, Position=0)] [DateTime] $Timestamp,
-        [Parameter()] [switch] $Utc
+        [Parameter(ParameterSetName='Current')] [switch] $Utc,
+        [Parameter(Mandatory=$true,ParameterSetName='Relative')] [DateTime] $RelativeTimestamp
     )
     End
     {
-        if ($Utc) { $now = [DateTime]::UtcNow } else { $now = [DateTime]::Now }
+        if ($PSCmdlet.ParameterSetName -eq 'Current')
+        {
+            if ($Utc) { $now = [DateTime]::UtcNow } else { $now = [DateTime]::Now }
+            $keywordLookup = @{$true='ago'; $false='from now'}
+        }
+        else
+        {
+            $now = $RelativeTimestamp
+            $keywordLookup = @{$true='earlier'; $false='later'}
+        }
         $minutesAgo = ($now - $Timestamp).TotalMinutes
         $minutesAbs = [Math]::Floor([Math]::Abs($minutesAgo))
         $value = if ($minutesAbs -eq 0) { 'less than a minute' }
@@ -3534,7 +3569,7 @@ Function Get-FuzzyTimestamp
         elseif ($minutesAbs -lt 157788000) { "$([Math]::Floor($minutesAbs/525600)) years" }
         else { "$([Math]::Floor($minutesAbs/525960)) years" }
 
-        $keyword = if ($minutesAgo -ge 0) { 'ago' } else { 'from now' }
+        $keyword = $keywordLookup[$minutesAgo -ge 0]
         "$value $keyword"
     }
 }

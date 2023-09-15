@@ -59,5 +59,13 @@ Describe "Get-IndentedText" {
         It "15 minutes ago (utc)" {
             Get-FuzzyTimestamp ([DateTime]::UtcNow.AddMinutes(15)) -Utc | Should Be "15 minutes from now"
         }
+
+        It "15 minutes earlier" {
+            Get-FuzzyTimestamp ([DateTime]::UtcNow.AddMinutes(-15)) -RelativeTime ([DateTime]::UtcNow) | Should Be "15 minutes earlier"
+        }
+
+        It "15 minutes later" {
+            Get-FuzzyTimestamp ([DateTime]::UtcNow.AddMinutes(15)) -RelativeTime ([DateTime]::UtcNow) | Should Be "15 minutes later"
+        }
     }
 }
