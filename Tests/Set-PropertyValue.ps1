@@ -197,5 +197,12 @@ Describe "Set-PropertyValue" {
                 ForEach-Object B |
                 Should Be '1+2+3'
         }
+
+        It "-JoinWith Empty String" {
+            [pscustomobject]@{A=1} |
+                Set-PropertyValue B { 1, 2, 3 } -JoinWith '' |
+                ForEach-Object B |
+                Should Be '123'
+        }
     }
 }

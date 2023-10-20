@@ -3432,7 +3432,7 @@ Function Set-PropertyValue
         {
             if (!$IfUnset -or [String]::IsNullOrWhiteSpace($newInputObject.$prop))
             {
-                if ($JoinWith) { $newValue = $newValue -join $JoinWith }
+                if ($PSBoundParameters.ContainsKey('JoinWith')) { $newValue = $newValue -join $JoinWith }
                 $newInputObject.$prop = $newValue
             }
         }
