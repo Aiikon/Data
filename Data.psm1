@@ -837,6 +837,9 @@ Function Join-List
     .PARAMETER SetOnUnmatched
     A dictionary of properties and values to set on all results without matches.
 
+    .EXAMPLE
+    Get-Service | Select-Object Name, Status | Join-List Status @([pscustomobject]@{Status='Running'; OK=$true}) -SetOnUnmatched @{OK=$false}
+
     #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
@@ -989,7 +992,11 @@ Function Join-List
             {
                 foreach ($propertyName in $setPropertyHash.GetEnumerator())
                 {
-                    $newObject[$propertyName] = $setOnMatchedValues[$propertyName]
+                    # Don't overwrite a value we already have if it's in SetOnUnmatched but not SetOnMatched
+                    if ($setOnMatchedValues.Contains($propertyName) -or !$newObject.Contains($propertyName))
+                    {
+                        $newObject[$propertyName] = $setOnMatchedValues[$propertyName]
+                    }
                 }
             }
 

@@ -218,6 +218,15 @@ Describe "Join-List" {
             $result[1].B | Should Be -1
             $result[1].M | Should Be $false
         }
+        
+        It "Doesn't overwrite joined data when using SetOnUnmatched" {
+            $result = [pscustomobject]@{A=1}, [pscustomobject]@{A=2} |
+                Join-List A ([pscustomobject]@{A=1;B='OK'}) -SetOnUnmatched @{B='Unknown'}
+            $result[0].A | Should Be 1
+            $result[0].B | Should Be 'OK'
+            $result[1].A | Should Be 2
+            $result[1].B | Should Be 'Unknown'
+        }
 
         It "Keeps order" {
             $result = [pscustomobject]@{A=1} |
