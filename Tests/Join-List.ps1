@@ -204,7 +204,7 @@ Describe "Join-List" {
 
         It "Sets values on unmatched right objects" {
             $result = [pscustomobject]@{A=1} |
-                Join-List A ([pscustomobject]@{A=2;B=-1}) -SetOnUnmatched @{M=$false} -IncludeUnmatchedRight
+                Join-List A ([pscustomobject]@{A=2;B=-1}) -SetOnUnmatched @{M=$false} -IncludeUnmatchedData
 
             @($result).Count | Should Be 2
             

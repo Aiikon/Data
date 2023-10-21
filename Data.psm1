@@ -327,6 +327,33 @@ Function Group-Denormalized
 
 Function Group-Pivot
 {
+    <#
+    .SYNOPSIS
+    Groups objects together and then creates new properties for each similar to a pivot table.
+
+    .PARAMETER InputObject
+    The objects to group.
+
+    .PARAMETER GroupProperty
+    The properties to group objects by.
+
+    .PARAMETER ColumnProperty
+    When creating resulting objects, will create a property for every unique value present in
+    this property on the input objects.
+
+    .PARAMETER ValueProperty
+    When creating resulting objects, will create a property for every unique value present in
+    the ColumnProperty using the value from first record with this ValueProperty.
+
+    .PARAMETER KeepFirst
+    Keep the first value of these properties in each group.
+
+    .PARAMETER NoCount
+    Do not create a Count property with the record count.
+    
+    .EXAMPLE
+    PS> Get-Partition | Group-Pivot DiskNumber PartitionNumber Size | Sort-Object DiskNumber | Format-Table
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -758,6 +785,59 @@ Function Join-Hashtable
 
 Function Join-List
 {
+    <#
+    .SYNOPSIS
+    Joins of two sets of objects similar to a SQL join with options to control the resulting properties.
+
+    .PARAMETER InputObject
+    The base objects to join to join with other objects.
+
+    .PARAMETER InputKeys
+    The properties on the input objects to use for key values.
+
+    .PARAMETER JoinData
+    The other objects to join to join with the base objects.
+
+    .PARAMETER JoinKeys
+    The properties on the other objects to use for key values. Defaults to InputKeys.
+
+    .PARAMETER MatchesOnly
+    Only return results where the key values were in both sets (akin to a SQL inner join).
+
+    .PARAMETER FirstMatchOnly
+    Only create one result per matching object; normally this will create one record per matching object.
+
+    .PARAMETER IncludeUnmatchedData
+    Create extra records at the end for every object in JoinData that didn't match with an InputObject
+    (akin to a SQL full outer join, or a right join when combined with MatchesOnly).
+
+    .PARAMETER KeepProperty
+    A list of properties to keep from JoinData and optionally rename; use string values to keep names
+    as-is or dictionaries in the format @{'OldPropertyName'='NewPropertyName'}. Defaults to all properties.
+
+    .PARAMETER Overwrite
+    Controls when to overwrite properties on the InputObject that also exist in JoinData.
+    - The default Never will never overwrite properties.
+    - Always will always overwrite properties from JoinData.
+    - IfNullOrEmpty will only overwrite properties that are null or empty strings on InputData.
+    - IfNewValueNotNullOrEmpty will only overwrite properties if they're not null or empty strings in JoinData.
+
+    .PARAMETER OverwriteAll
+    DEPRECATED. Use -Overwrite Always.
+
+    .PARAMETER OverwriteNull
+    DEPRECATED. Use -Overwrite IfNullOrEmpty.
+
+    .PARAMETER KeyJoin
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
+
+    .PARAMETER SetOnMatched
+    A dictionary of properties and values to set on all results from matches.
+
+    .PARAMETER SetOnUnmatched
+    A dictionary of properties and values to set on all results without matches.
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -766,8 +846,8 @@ Function Join-List
         [Parameter(Position=1)] [object[]] $JoinData,
         [Parameter(Position=2)] [string[]] $JoinKeys,
         [Parameter()] [switch] $MatchesOnly,
-        [Parameter()] [switch] $FirstRightOnly,
-        [Parameter()] [switch] $IncludeUnmatchedRight,
+        [Parameter()] [Alias('FirstRightOnly')] [switch] $FirstMatchOnly,
+        [Parameter()] [Alias('IncludeUnmatchedRight')] [switch] $IncludeUnmatchedData,
         [Parameter()] [object[]] $KeepProperty,
         [Parameter()] [ValidateSet('Never', 'Always', 'IfNullOrEmpty', 'IfNewValueNotNullOrEmpty')] [string] $Overwrite = 'Never',
         [Parameter()] [switch] $OverwriteAll,
@@ -914,12 +994,12 @@ Function Join-List
             }
 
             [pscustomobject]$newObject
-            if ($FirstRightOnly) { break }
+            if ($FirstMatchOnly) { break }
         }
     }
     End
     {
-        if (!$IncludeUnmatchedRight) { return }
+        if (!$IncludeUnmatchedData) { return }
         $inputPropertyList = $InputObject.PSObject.Properties.Name
         foreach ($joinKeyValue in $joinDict.GetEnumerator())
         {
@@ -960,7 +1040,7 @@ Function Join-List
                 }
 
                 [pscustomobject]$newObject
-                if ($FirstRightOnly) { break }
+                if ($FirstMatchOnly) { break }
             }
         }
     }
