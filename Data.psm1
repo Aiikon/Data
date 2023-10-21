@@ -838,6 +838,9 @@ Function Join-List
     A dictionary of properties and values to set on all results without matches.
 
     .EXAMPLE
+    Get-Disk | Select-Object Number, FriendlyName | Join-List Number @(Get-Partition) DiskNumber -KeepProperty Type, DriveLetter, @{Size='PartitionSize'}
+
+    .EXAMPLE
     Get-Service | Select-Object Name, Status | Join-List Status @([pscustomobject]@{Status='Running'; OK=$true}) -SetOnUnmatched @{OK=$false}
 
     #>
@@ -1101,6 +1104,52 @@ Function Join-Index
 
 Function Join-MissingSetCounts
 {
+    <#
+    .SYNOPSIS
+    Inserts missing count values in a one or two dimensional set of objects.
+
+    .PARAMETER InputObject
+    The objects to process.
+
+    .PARAMETER Set1Property
+    The main property to check for values.
+
+    .PARAMETER Set1Values
+    The list of expected values of Set1Property; this will generate new objects for each missing value.
+
+    .PARAMETER Mode
+    The filtering mode of the cmdlet; SortAndInsert only inserts new values while SortAndFilter also filters out values not present in Set1Values.
+
+    .PARAMETER Set2Property
+    An optional second property to check for values.
+
+    .PARAMETER Set2Values
+    The list of expected values of Set2Property.
+
+    .PARAMETER CountProperty
+    The name of the property to put the count value in. Defaults to Count.
+
+    .PARAMETER CountValue
+    The actual value to insert. Defaults to 0.
+
+    .PARAMETER PercentageProperty
+    An optional property to insert "0%" into.
+
+    .PARAMETER KeyJoin
+    If both Set1Property and Set2Property are used the values are joined with this value when making the key for each group. Defaults to '|'.
+
+    .EXAMPLE
+    [pscustomobject]@{Category='Widgets';Count=5},[pscustomobject]@{Category='Gadgets';Count=2} |
+        Join-MissingSetCounts Category @('Widgets', 'Gadgets', 'Things')
+
+    .EXAMPLE
+    @(
+        [pscustomobject]@{Name='Person A'; Mode='Car'; Miles=1234}
+        [pscustomobject]@{Name='Person B'; Mode='Car'; Miles=900}
+        [pscustomobject]@{Name='Person B'; Mode='Bike'; Miles=55}
+    ) |
+        Join-MissingSetCounts -Set1Property Name -Set1Values 'Person A', 'Person B', 'Person C' -Set2Property Mode -Set2Values Car, Bike -CountProperty Miles
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -1404,13 +1453,37 @@ Function Join-MissingTimestamps
 
 Function Join-Percentage
 {
+    <#
+    .SYNOPSIS
+    Inserts a Percentage property into a set of records with counts containing the percentage of the total.
+
+    .PARAMETER InputObject
+    The objects to add properties to.
+
+    .PARAMETER CountProperty
+    The property containing a count. Defaults to Count.
+
+    .PARAMETER PercentageProperty
+    The property to insert the percentage into. Defaults to Percentage.
+
+    .PARAMETER DecimalPlaces
+    The number of decimal places to use for the percentage value. Defaults to 0.
+
+    .PARAMETER AsDouble
+    Write the percentage as a double value rather than a string. Default DecimalPlaces is 2.
+
+    .EXAMPLE
+    Get-Process | Select-Object Name, Id, PrivateMemorySize | Sort-Object PrivateMemorySize | Join-Percentage PrivateMemorySize
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
         [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
         [Parameter(Position=0)] [string] $CountProperty = 'Count',
         [Parameter()] [string] $PercentageProperty = 'Percentage',
-        [Parameter()] [int] $DecimalPlaces = 0
+        [Parameter()] [int] $DecimalPlaces,
+        [Parameter()] [switch] $AsDouble
     )
     Begin
     {
@@ -1423,12 +1496,20 @@ Function Join-Percentage
     }
     End
     {
+        $DecimalPlaces = if ($PSBoundParameters.ContainsKey('DecimalPlaces')) { $DecimalPlaces } elseif ($AsDouble) { 2 } else { 0 }
         $total = $inputObjectList | Measure-Object -Sum $CountProperty | ForEach-Object Sum
         foreach ($inputObject in $inputObjectList)
         {
             $newInputObject = [Rhodium.Data.DataHelpers]::CloneObject($InputObject, @($PercentageProperty))
-            $percentage = [Math]::Round($newInputObject.$CountProperty * 100 / $total, $DecimalPlaces)
-            $newInputObject.$PercentageProperty = "$percentage%"
+            if ($AsDouble)
+            {
+                $newInputObject.$PercentageProperty = [Math]::Round($newInputObject.$CountProperty / $total, $DecimalPlaces)
+            }
+            else
+            {
+                $percentage = [Math]::Round($newInputObject.$CountProperty * 100 / $total, $DecimalPlaces)
+                $newInputObject.$PercentageProperty = "$percentage%"
+            }
             $newInputObject
         }
     }
