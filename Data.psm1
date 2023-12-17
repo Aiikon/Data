@@ -1797,7 +1797,7 @@ Function Join-Self
     .PARAMETER ScriptBlock
     The scriptblock to execute to process the input objects. Uses $input to refer to the pipeline.
 
-    .PARAMETER InputKeys
+    .PARAMETER JoinKeys
     The keys on the scriptblock side to join the input and processed input objects on. Optional. Defaults to InputKeys.
 
     .PARAMETER KeyJoin
@@ -1913,6 +1913,30 @@ Function Join-Self
 
 Function Join-TotalRow
 {
+    <#
+    .SYNOPSIS
+    Passes all objects through the pipeline and adds a new object at the end containing the total value of a column.
+    The new object contains the same properties as the input objects with the first property value instead being "Total".
+
+    .PARAMETER InputObject
+    The input objects to process.
+
+    .PARAMETER CountProperty
+    The property to sum up and store the total count in. Defaults to Count.
+
+    .PARAMETER PercentageProperty
+    An optional property to store the value '100%'. Defaults to Percentage. Will only be added if present on the input objects.
+
+    .PARAMETER TotalLabel
+    The value to put in the first property.
+
+    .EXAMPLE
+    Get-Service |
+        Group-Object StartType |
+        Select-Object Name, Count |
+        Join-TotalRow -CountProperty Count -TotalLabel "All"
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
@@ -1947,6 +1971,35 @@ Function Join-TotalRow
 
 Function Join-UniqueIndex
 {
+    <#
+    .SYNOPSIS
+    Gets the unique values from a property on the input objects, creates an index for each value
+    and stores this index value in a new property on the objects.
+
+    .PARAMETER InputObject
+    The input objects to process.
+
+    .PARAMETER Property
+    The properties to look up unique values on.
+
+    .PARAMETER IndexProperty
+    The property to store the new unique index value in.
+
+    .PARAMETER StartAt
+    The value to start the index at. Defaults to 0.
+
+    .PARAMETER KeyJoin
+    Property values are grouped as strings; join them with this value when making the key for each group. Defaults to '|'.
+
+    .PARAMETER StartingValues
+    A list of values to add to the unique indexes first; they don't have to be in the input objects.
+
+    .EXAMPLE
+    Get-Service |
+        Select-Object Name, StartType |
+        Join-UniqueIndex StartType
+
+    #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
