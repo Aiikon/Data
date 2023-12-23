@@ -651,7 +651,7 @@ Function Join-GroupHeaderRow
     Param
     (
         [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
-        [Parameter(Position=0, Mandatory=$true)] [string[]] $Property,
+        [Parameter(Position=0)] [string[]] $Property,
         [Parameter(Position=1)] [scriptblock] $ObjectScript,
         [Parameter()] [switch] $AsFooter,
         [Parameter()] [switch] $SkipSingles,
@@ -676,7 +676,14 @@ Function Join-GroupHeaderRow
         foreach ($p in $Property) { $firstPropertyDict[$p] = $true }
         foreach ($p in $KeepFirst) { $firstPropertyDict[$p] = $true }
         foreach ($p in $Subtotal) { $sumPropertyDict[$p] = $true }
-        $groupDict = $inputObjectList | ConvertTo-Dictionary -Ordered -Keys $Property -KeyJoin $KeyJoin
+        if ($Property)
+        {
+            $groupDict = $inputObjectList | ConvertTo-Dictionary -Ordered -Keys $Property -KeyJoin $KeyJoin
+        }
+        else
+        {
+            $groupDict = @{'No Key'=$inputObjectList}
+        }
         foreach ($pair in $groupDict.GetEnumerator())
         {
             if ($SkipSingles -and $pair.Value.Count -eq 1)

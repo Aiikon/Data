@@ -140,8 +140,25 @@ Describe "Join-GroupHeaderRow" {
 
             $result[1] | Should Be $inputList[0]
             $result[2] | Should Be $inputList[1]   
-
             $result[3] | Should Be $inputList[2]
+        }
+
+        It 'Works with no Property' {
+            $inputList = @(
+                [pscustomobject]@{A=1;B=1;Count=2}
+                [pscustomobject]@{A=1;B=2;Count=3}
+                [pscustomobject]@{A=2;B=3;Count=4}
+            )
+
+            $result = $inputList |
+                Join-GroupHeaderRow -Set @{A='Total'} -Subtotal Count -AsFooter
+
+            $result[0] | Should Be $inputList[0]
+            $result[1] | Should Be $inputList[1]   
+            $result[2] | Should Be $inputList[2]
+
+            $result[3].A | Should Be Total
+            $result[3].Count | Should Be 9
         }
     }
 }
