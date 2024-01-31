@@ -1078,6 +1078,12 @@ Function Join-Index
     .PARAMETER Start
     The value to start numbering at. Defaults to 0.
 
+    .PARAMETER KeyProperty
+    Optionally keep track of indexes for each unique key value for the specified key properties.
+
+    .PARAMETER KeyJoin
+    Objects are grouped as though their values were strings; join them with this value when making the key for each group. Defaults to '|'.
+
     .EXAMPLE
     Get-Service |
         Select-Object Name, DisplayName |
@@ -1088,24 +1094,45 @@ Function Join-Index
         Select-Object Name, Length |
         Join-Index -IndexProperty FilePosition -Start 1
 
+    .EXAMPLE
+    Get-Service |
+        Select-Object Name, StartType, Status |
+        Sort-Object StartType, Status |
+        Join-Index -KeyProperty StartType, Status
+
     #>
     [CmdletBinding(PositionalBinding=$false)]
     Param
     (
         [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
         [Parameter(Position=0)] [string] $IndexProperty = 'Index',
-        [Parameter()] [int] $Start = 0
+        [Parameter()] [int] $Start = 0,
+        [Parameter()] [string[]] $KeyProperty,
+        [Parameter()] [string] $KeyJoin = '|'
     )
     Begin
     {
         $index = $Start
+        $keyIndices = @{}
     }
     Process
     {
         $newInputObject = [Rhodium.Data.DataHelpers]::CloneObject($InputObject, @($IndexProperty))
-        $newInputObject.$IndexProperty = $index
-        $newInputObject
-        $index += 1
+
+        if ($KeyProperty)
+        {
+            $keyValue = $(foreach ($p in $KeyProperty) { $newInputObject.$p }) -join $KeyJoin
+            $index = if ($keyIndices.ContainsKey($keyValue)) { $keyIndices[$keyValue] } else { $Start }
+            $newInputObject.$IndexProperty = $index
+            $newInputObject
+            $keyIndices[$keyValue] = $index + 1
+        }
+        else
+        {
+            $newInputObject.$IndexProperty = $index
+            $newInputObject
+            $index += 1
+        }
     }
 }
 
