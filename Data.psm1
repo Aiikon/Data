@@ -39,6 +39,144 @@ namespace Rhodium.Data
 }
 "@
 
+Function Group-CommonSetValues
+{
+    <#
+    .SYNOPSIS
+    Groups objects together when one of their multi-value properties shares common values.
+
+    .PARAMETER InputObject
+    The objects to group.
+
+    .PARAMETER Property
+    The common value list property to group the objects by.
+
+    .PARAMETER GroupProperty
+    The name of the property to store the group in. Defaults to Group.
+
+    .PARAMETER CountProperty
+    The name of a property to store the group count in.
+
+    .PARAMETER SplitOn
+    An optional expression to split the values in $Property by.
+
+    .EXAMPLE
+    @(
+        [pscustomobject]@{Name='Person 1'; Colors='Red, Blue'}
+        [pscustomobject]@{Name='Person 2'; Colors='Blue'}
+        [pscustomobject]@{Name='Person 3'; Colors='Green, Blue'}
+        [pscustomobject]@{Name='Person 5'; Colors='Purple'}
+        [pscustomobject]@{Name='Person 5'; Colors='Orange'}
+        [pscustomobject]@{Name='Person 6'; Colors='Orange, Yellow'}
+        [pscustomobject]@{Name='Person 7'; Colors='Green'}
+    ) | 
+        Group-CommonSetValues Colors -SplitOn ', *'
+
+    #>
+    [CmdletBinding(PositionalBinding=$false)]
+    Param
+    (
+        [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
+        [Parameter(Position=0, Mandatory=$true)] [string] $Property,
+        [Parameter()] [string] $KeysProperty = 'Keys',
+        [Parameter()] [string] $GroupProperty = 'Group',
+        [Parameter()] [string] $CountProperty,
+        [Parameter()] [string] $SplitOn
+    )
+    Begin
+    {
+        $inputObjectList = [System.Collections.Generic.List[object]]::new()
+    }
+    Process
+    {
+        if (!$InputObject) { return }
+        $inputObjectList.Add($InputObject)
+    }
+    End
+    {
+        trap { $PSCmdlet.ThrowTerminatingError($_) }
+
+        $groupCandidateDict = [ordered]@{}
+        $i = 0
+        foreach ($InputObject in $inputObjectList)
+        {
+            $keyDict = [ordered]@{}
+            $splitKeyList = $InputObject.$Property
+            if ($SplitOn) { $splitKeyList = $splitKeyList -split $SplitOn }
+            foreach ($key in $splitKeyList)
+            {
+                $keyDict[$key] = $true
+            }
+            $keyList = @($keyDict.GetEnumerator()).Key
+
+            foreach ($key1 in $keyList)
+            {
+                $keyGroup = $groupCandidateDict[$key1]
+                if (!$keyGroup)
+                {
+                    $keyGroup = [pscustomobject]@{
+                        Keys = [ordered]@{}
+                        Values = [System.Collections.Generic.List[object]]::new()
+                    }
+                    $keyGroup.Keys[$key1] = $true
+                    $groupCandidateDict[$key1] = $keyGroup
+                }
+                foreach ($key2 in $keyList)
+                {
+                    if ($key1 -eq $key2) { continue }
+                    $keyGroup.Keys[$key2] = $true
+                }
+            }
+
+            $keyGroup.Values.Add($InputObject)
+        }
+
+        $PSCmdlet.WriteDebug("Merging key groups")
+
+        $pass = 1
+        do
+        {
+            $mergeCount = 0
+            foreach ($candidateKey in @($groupCandidateDict.GetEnumerator()).Key)
+            {
+                $groupCandidate = $groupCandidateDict[$candidateKey]
+                if (!$groupCandidate) { continue } # Another group claimed this key
+                foreach ($keyValue in @($groupCandidate.Keys.GetEnumerator()).Key)
+                {
+                    $mergeCandidate = $groupCandidateDict[$keyValue]
+                    if ($mergeCandidate -and $mergeCandidate -ne $groupCandidate)
+                    {
+                        $PSCmdlet.WriteDebug("Merging with group with key '$keyValue'")
+                        $groupCandidateDict.Remove($keyValue)
+                        foreach ($newKeyValue in @($mergeCandidate.Keys.GetEnumerator()).Key)
+                        {
+                            $groupCandidate.Keys[$newKeyValue] = $true
+                        }
+                        foreach ($newValue in $mergeCandidate.Values)
+                        {
+                            $groupCandidate.Values.Add($newValue)
+                        }
+                        $mergeCount += 1
+                    }
+                }
+                if ($mergeCount -gt 0) { break }
+            }
+            $PSCmdlet.WriteDebug("Merged $mergeCount KeyGroups in pass $pass")
+            $pass += 1
+        } while ($mergeCount)
+
+        foreach ($group in @($groupCandidateDict.GetEnumerator()).Value)
+        {
+            $result = [ordered]@{
+                $KeysProperty = @(@($group.Keys.GetEnumerator()).Key)
+                $GroupProperty = $group.Values
+            }
+            if ($CountProperty) { $result.$CountProperty = $group.Values.Count }
+            [pscustomobject]$result
+        }
+    }
+}
+
 Function Group-Denormalized
 {
     <#

@@ -87,6 +87,7 @@ NestedModules = @('Data.psm1')
 
 # Functions to export from this module
 FunctionsToExport = @(
+    'Group-CommonSetValues'
     'Group-Denormalized'
     'Group-Pivot'
     'Group-SequentialSame'
