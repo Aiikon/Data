@@ -120,6 +120,7 @@ FunctionsToExport = @(
     'Set-PropertyDateTimeBreakpoint'
     'Set-PropertyDateTimeFloor'
     'Set-PropertyDateTimeFormat'
+    'Set-PropertyRegexValue'
     'Set-PropertyRounding'
     'Set-PropertyStringFormat'
     'Set-PropertyTotalValue'

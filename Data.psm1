@@ -3529,6 +3529,141 @@ Function Set-PropertyDateTimeFormat
     }
 }
 
+Function Set-PropertyRegexValue
+{
+    <#
+    .SYNOPSIS
+    Extracts properties from the text of a property on an input object. Similar to the Splunk 'rex' command.
+
+    .PARAMETER InputObject
+    Objects with property to extract values from.
+
+    .PARAMETER From
+    The property containing the text to extract values from.
+
+    .PARAMETER Regex
+    The regular expressions to use to capture values. The first matching regex will be used.
+    Property names are taken from the first regex unless KeepProperty
+
+    .PARAMETER GroupNames
+    The names of the groups if they're unnamed in the regex.
+
+    .PARAMETER KeepProperty
+    A list of properties to keep from the regex. GroupNames overrides this.
+
+    .PARAMETER DefaultValues
+    A dictionary of default values to provide for groups that did not match or if no regex matched.
+
+    .PARAMETER ActionIfNotMatched
+    The action to take if no regex match. Defaults to Error to write an error record.
+    Using Ignore will pass the object with empty values.
+    Using UseDefaultValues will pass the object with values from DefaultValues.
+
+    .PARAMETER Overwrite
+    When to overwrite properties on the base object. Defaults to Always.
+    Using IfNullOrEmpty will only overwrite properties on the input object that are null or empty strings.
+
+    .EXAMPLE
+    [pscustomobject]@{SourceProperty="Today is 2024-01-01"} | Set-PropertyRegexValue -From SourceProperty -Regex "Today is (?<Date>[\d\-]+)"
+
+    .EXAMPLE
+    [pscustomobject]@{SourceProperty="Today is 2024-01-01"} | Set-PropertyRegexValue -From SourceProperty -Regex "Today is ([\d\-]+)" -GroupNames Date
+
+    #>
+    [CmdletBinding(PositionalBinding=$false)]
+    Param
+    (
+        [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
+        [Parameter(Mandatory=$true, Position=0)] [string] $From,
+        [Parameter(Mandatory=$true, Position=1)] [regex[]] $Regex,
+        [Parameter()] [string[]] $GroupNames,
+        [Parameter()] [string[]] $KeepProperty,
+        [Parameter()] [ValidateSet('Error', 'Ignore', 'UseDefaultValues')] [string] $ActionIfNotMatched = 'Error',
+        [Parameter()] [hashtable] $DefaultValues,
+        [Parameter()] [ValidateSet('Always', 'IfNullOrEmpty')] [string] $Overwrite = 'Always'
+    )
+    Begin
+    {
+        $propertyNameDict = [ordered]@{}
+        if ($ActionIfNotMatched -eq 'UseDefaultValues' -and !$DefaultValues) { throw "DefaultValues must be provided if ActionIfNotMatched is set to UseDefaultValues." }
+        if ($GroupNames -and $KeepProperty) { throw "GroupNames and KeepProperty can't be provided together." }
+        if ($GroupNames)
+        {
+            for ($i = 1; $i -le $GroupNames.Count; $i++)
+            {
+                $propertyNameDict[[string]$i] = $GroupNames[$i-1]
+            }
+        }
+        elseif ($KeepProperty)
+        {
+            foreach ($property in $KeepProperty)
+            {
+                $propertyNameDict[$property] = $property
+            }
+        }
+        else
+        {
+            foreach ($regexItem in $Regex)
+            {
+                foreach ($name in $regexItem.GetGroupNames())
+                {
+                    if ($name -ne "0") { $propertyNameDict[$name] = $name }
+                }
+            }
+        }
+        $propertyNameList = @(@($propertyNameDict.GetEnumerator()).Value)
+    }
+    Process
+    {
+        if (!$InputObject) { return }
+
+        $newInputObject = [Rhodium.Data.DataHelpers]::CloneObject($InputObject, $propertyNameList)
+        $string = $newInputObject.$From
+        if ([String]::IsNullOrEmpty($string)) { return $newInputObject }
+
+        foreach ($regexItem in $Regex)
+        {
+            $matchInfo = $regexItem.Match($string)
+            if (!$matchInfo.Success) { continue }
+            foreach ($pair in $propertyNameDict.GetEnumerator())
+            {
+                $group = $matchInfo.Groups[$pair.Key]
+                $canOverwrite = $Overwrite -eq 'Always' -or ($Overwrite -eq 'IfNullOrEmpty' -and [String]::IsNullOrEmpty($newInputObject.($pair.Value)))
+                if (!$canOverwrite) { continue }
+                if ($group.Success)
+                {
+                    $newInputObject.($pair.Value) = $group.Value
+                }
+                elseif ($DefaultValues -and $DefaultValues.Contains($pair.Value))
+                {
+                    $newInputObject.($pair.Value) = $DefaultValues[$pair.Value]
+                }
+            }
+            return $newInputObject
+        }
+
+        if ($ActionIfNotMatched -eq 'Error')
+        {
+            Write-Error "No regex matches found for object."
+            return $newInputObject
+        }
+        elseif ($ActionIfNotMatched -eq 'UseDefaultValues')
+        {
+            foreach ($pair in $propertyNameDict.GetEnumerator())
+            {
+                if ($DefaultValues.Contains($pair.Value)) { $default = $DefaultValues[$pair.Value] }
+                elseif ($DefaultValues.Contains('*')) { $default = $DefaultValues['*'] }
+                else { continue }
+                $canOverwrite = $Overwrite -eq 'Always' -or ($Overwrite -eq 'IfNullOrEmpty' -and [String]::IsNullOrEmpty($newInputObject.($pair.Value)))
+                if (!$canOverwrite) { continue }
+                $newInputObject.($pair.Value) = $default
+
+            }
+        }
+        $newInputObject
+    }
+}
+
 Function Set-PropertyRounding
 {
     <#
