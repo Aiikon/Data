@@ -4274,6 +4274,39 @@ Function ConvertTo-Object
     }
 }
 
+Function Sort-ByPropertyNumeric
+{
+    [CmdletBinding(PositionalBinding=$false)]
+    Param
+    (
+        [Parameter(ValueFromPipeline=$true)] [object] $InputObject,
+        [Parameter(Position=0)] [string] $Property
+    )
+    Begin
+    {
+        $inputObjectList = New-Object System.Collections.Generic.List[object]
+    }
+    Process
+    {
+        if (!$InputObject) { return }
+        $value = $InputObject.$Property
+        if ($value -match "^(.+?)(\d+)$")
+        {
+            $inputObjectList.Add([pscustomobject]@{Alpha=$Matches[1]; Numeric=[int64]($Matches[2]); Object=$InputObject})
+        }
+        else
+        {
+            $inputObjectList.Add([pscustomobject]@{Alpha=$value; Numeric=0; Object=$InputObject})
+        }
+    }
+    End
+    {
+        $inputObjectList |
+            Sort-Object Alpha, Numeric |
+            ForEach-Object Object
+    }
+}
+
 Function Sort-ByPropertyValue
 {
     [CmdletBinding(PositionalBinding=$false)]

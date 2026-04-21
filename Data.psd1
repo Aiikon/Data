@@ -138,6 +138,7 @@ FunctionsToExport = @(
     'ConvertTo-Object'
     'Convert-DateTimeZone'
     'Convert-PropertyEmptyValue'
+    'Sort-ByPropertyNumeric'
     'Sort-ByPropertyValue'
     'Select-UniformProperty'
     'Assert-Count'
